@@ -1,0 +1,70 @@
+---
+title: "Spatial Regression Data"
+author: "Katy Koenig"
+date: "5/2/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidycensus)
+library(data.table)
+
+```
+
+```{r}
+v18 <- load_variables(2018, "acs5", cache=TRUE)
+# clean variables names
+v18$tmp <- str_extract(v18$label,'(?<=Estimate!!).*')
+v18$col_names <- str_extract(v18$label,'(?<=Estimate!!Total!!).*')
+v18$col_names[is.na(v18$col_names)] <- v18$tmp[is.na(v18$col_names)]
+
+download_data <- function(code){
+    get_acs(
+    geography = "block group",
+    table = c(code),
+    state = '17',
+    county = '031',
+    cache_table = TRUE,
+    output = "wide",
+    year=2018
+)
+}
+
+rename_cols <- function(name, acs_tbl){
+    # replace where last letter taken off with label
+    names(acs_tbl) <- append(names(acs_tbl)[1], sub("E.*", "",
+                                                    names(acs_tbl)[2:length(names(acs_tbl))]))
+    
+    # rename cols with real words!
+    new_col_names <- names(acs_tbl)[1]
+    for (col_name in sub("E.*", "", names(acs_tbl)[2:length(names(acs_tbl))])){
+        rel_info <- v18[v18$name == col_name, ]
+        new_name <- paste(rel_info$col_names, name, sep='_')
+        new_col_names <- append(new_col_names, new_name)
+    }
+    names(acs_tbl) <- new_col_names
+}
+
+# issue c('vehicles_worker', 'B08203'),
+desired_vars <- list(c('race', 'B02001'), c('age_by_sex', 'B01001'),
+                     c('employment', 'B24080'), c('income', 'B19001'),
+                     c('commute_time', 'B08134'), c('transport_mode', 'B08301'),
+                     c('population', 'B01001'))
+
+for (var in desired_vars){
+    name <- var[1]
+    code <- var[2]
+    tmp_tbl <- download_data(code)
+    # drop column if ends in M
+    tmp_tbl <- tmp_tbl[, -(grep('M', colnames(tmp_tbl), perl = TRUE))]
+    names(tmp_tbl) <- rename_cols(name, tmp_tbl)
+    write.csv(tmp_tbl, file = paste( paste0('data/acs/',name), 'csv', sep='.'), row.names = FALSE)
+}
+
+vehicles_work_tbl <- download_data('B08203')
+```
+```{R}
+print('test')
+```
