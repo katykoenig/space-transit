@@ -63,8 +63,4 @@ for (var in desired_vars){
     write.csv(tmp_tbl, file = paste( paste0('data/acs/',name), 'csv', sep='.'), row.names = FALSE)
 }
 
-vehicles_work_tbl <- download_data('B08203')
-```
-```{R}
-print('test')
 ```
