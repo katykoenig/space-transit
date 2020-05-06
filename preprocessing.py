@@ -14,33 +14,13 @@ import pandas as pd
 locale.setlocale(locale.LC_ALL, "")   
 
 
-SPEC_CLEANING_FNS = {
-    'income.csv': get_info_poverty,
-    'population.csv': get_info_pop,
-    'race.csv': get_race_info,
-    'commute_time.csv': get_commute_info
-}
-
-
-def load_link_acs(folder='data/ACS/', cleaning_fns=SPEC_CLEANING_FNS):
-    '''
-    Reads in ACS data and links csvs
-
-    Input:
-        folder(str): name of folder in which data is located
-
-    Output:
-        df with all data linked by block group
-    '''
-    rel_files = glob.glob(f'{folder}/*.csv')
-    csv_lst = [pd.read_csv(file) for file in rel_files]
-    for (csv, cleaning_fn) in cleaning_fns.items()
-    # total_acs = reduce(lambda x, y: pd.merge(x, y, on=['GEOID']), csv_lst)
-    return rel_files
-
-
 def get_info_pop(pop_df):
     '''
+
+    Input:
+        pop_df
+
+    Output:
     '''
     pop_df['total_pop'] = pop_df['Total_population']
     working_age_cols = find_rel_cols(pop_df, 15, 65, '\d\d')
@@ -51,30 +31,52 @@ def get_info_pop(pop_df):
 
 def get_info_poverty(income_df):
     '''
-    '''
-    # poverty threshold for family of 4 is 26,200 (https://aspe.hhs.gov/poverty-guidelines)
+    # poverty threshold for family of 4 is 26,200
+    # (https://aspe.hhs.gov/poverty-guidelines)
     # closest bin starts at 25,000
+
+    Input:
+        income_df:
+
+    Output:
+    '''
     income_df['total_hh'] = income_df['Total_income']
     poverty_cols = find_rel_cols(income_df, 0, 25000, '\d.*?\d\,\d+')
-    income_df['pct_hh_pov'] = income_df[poverty_cols].sum(axis=1) / income_df['Total_income']
+    income_df['pct_hh_pov'] = income_df[poverty_cols].sum(axis=1) / \
+                              income_df['Total_income']
     return income_df[['GEOID', 'total_hh', 'pct_hh_pov']]
 
 
 def get_race_info(race_df):
     '''
+    Cleans up data re. race to show percentage breakdown
+
+    Input:
+        race_df: dataframe of basic race data
+
+    Output: dataframe of pct pop that is white, black or another race
     '''
     race_df['pct_white'] = race_df['White alone_race'] / race_df['Total_race']
-    race_df['pct_black'] = race_df['Black or African American alone_race'] / race_df['Total_race']
+    race_df['pct_black'] = race_df['Black or African American alone_race'] / \
+                           race_df['Total_race']
     race_df['pct_other'] = 1.0 - (race_df['pct_white'] + race_df['pct_black'])
     return race_df[['GEOID', 'pct_white', 'pct_black', 'pct_other']]
 
 
 def get_commute_info(commute_df):
     '''
+    Cleans up the data re. commuting to only show percentage of commuters
+    with high commute times and percentage of commuters by commute mode.
+    Note: as the median commute overall was 30-34 mins bin, a high/long commute
+    was determined to be a commute time of 35+ mins
+
+    Input:
+        commute_df: dataframe of commuting info
+
+    Output: df of pct of commuters with high commute time and by commute mode
     '''
     cols_to_show = ['GEOID', 'pct_long_commute']
     # Find percentage of "long commuters"
-    # median commute overall was 30-34 mins so long commute anything above 35
     time_cols = ['Less than 10 minutes_commute_time',
                  '10 to 14 minutes_commute_time',
                  '15 to 19 minutes_commute_time',
@@ -103,14 +105,42 @@ def get_commute_info(commute_df):
 
 def get_employment_info(employ_df):
     '''
-    '''
-    # need to divide by total population (from another df)
-    #employ_df['Total_employment'] / 
+    Returns only relevant columns of employment data
+    (Basically only so the loop in load_link_acs is clean)
 
+    Input:
+        employ_df: dataframe of employment info
+
+    Output: a smaller version of the input df 
+    '''
+    return employ_df[['GEOID', 'Total_employment']]
+
+
+def clean_employment(df):
+    '''
+    Gets the percent employed for each census block instead of
+    total count of employed
+
+    Input:
+        df: full acs dataframe
+
+    Output: full acs df with pct_employed col instead of a count of employment
+    '''
+    df['pct_employed'] = df['Total_employment'] / df['total_pop']
+    return df.drop(columns=['Total_employment'])
 
 
 def find_rel_cols(df, min_val, max_val, regex_str):
     '''
+
+    Inputs:
+        df:
+        min_val(int/float):
+        max_val(int/float):
+        regex_str:
+
+    Output
+        rel_cols_set
     '''
     rel_cols_set = set()
     for col in df.columns:
@@ -119,3 +149,38 @@ def find_rel_cols(df, min_val, max_val, regex_str):
                 rel_cols_set.add(col)
     return rel_cols_set
 
+
+SPEC_CLEANING_FNS = {
+    'income.csv': get_info_poverty,
+    'population.csv': get_info_pop,
+    'race.csv': get_race_info,
+    'commute_time.csv': get_commute_info,
+    'employment.csv': get_employment_info
+}
+
+
+def load_link_acs(folder='data/ACS/', cleaning_fns=SPEC_CLEANING_FNS):
+    '''
+    Reads in ACS data and links csvs
+
+    Input:
+        folder(str): name of folder in which data is located
+
+    Output:
+        df with all data linked by block group
+    '''
+    # Find related files
+    rel_files = glob.glob(f'{folder}/*.csv')
+
+    df_lst = []
+    # Link with correct cleaning function
+    for csvname in cleaning_fns.keys():
+        saved_name = f'{folder}{csvname}'
+        for file in rel_files:
+            if file == saved_name:
+                dirty_df = pd.read_csv(file)
+                cleaned_df = cleaning_fns[csvname](dirty_df)
+                df_lst.append(cleaned_df)
+    # Merge all dfs together
+    total_acs = reduce(lambda x, y: pd.merge(x, y, on=['GEOID']), df_lst)
+    return clean_employment(total_acs)
