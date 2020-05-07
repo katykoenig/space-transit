@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(tidycensus)
 library(data.table)
-
+library(sf)
 ```
 
 ```{r}
@@ -51,7 +51,7 @@ rename_cols <- function(name, acs_tbl){
 desired_vars <- list(c('race', 'B02001'), c('age_by_sex', 'B01001'),
                      c('employment', 'B24080'), c('income', 'B19001'),
                      c('commute_time', 'B08134'), c('transport_mode', 'B08301'),
-                     c('population', 'B01001'))
+                     c('population', 'B01001'), c('num_vehicles', 'B992512'))
 
 for (var in desired_vars){
     name <- var[1]
@@ -63,4 +63,7 @@ for (var in desired_vars){
     write.csv(tmp_tbl, file = paste( paste0('data/acs/',name), 'csv', sep='.'), row.names = FALSE)
 }
 
+boundaries <- download_data('B19001')
+block_group_bound <- boundaries[,c('GEOID', 'NAME', 'geometry')]
+st_write(block_group_bound, "block_groups.shp")
 ```
