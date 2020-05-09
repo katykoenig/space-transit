@@ -73,6 +73,7 @@ def get_commute_info(commute_df):
     with high commute times and percentage of commuters by commute mode.
     Note: as the median commute overall was 30-34 mins bin, a high/long commute
     was determined to be a commute time of 35+ mins
+    top 1/3 of commuters 45 + mins
 
     Input:
         commute_df: dataframe of commuting info
@@ -90,7 +91,7 @@ def get_commute_info(commute_df):
                  '35 to 44 minutes_commute_time',
                  '45 to 59 minutes_commute_time',
                  '60 or more minutes_commute_time']
-    long_comm_cols = find_rel_cols(commute_df[time_cols], 35, 1000, '\d\d')
+    long_comm_cols = find_rel_cols(commute_df[time_cols], 45, 1000, '\d\d')
     commute_df['pct_long_commute'] = commute_df[long_comm_cols].sum(axis=1) / \
                                         commute_df['Total_commute_time']
 
@@ -102,7 +103,8 @@ def get_commute_info(commute_df):
                  ('Public transportation (excluding taxicab)_commute_time',
                     'pct_transit')]
     for (mode_col, new_col_name) in mode_cols:
-        commute_df[new_col_name] = commute_df[mode_col] / commute_df['Total_commute_time']
+        commute_df[new_col_name] = commute_df[mode_col] / \
+                                   commute_df['Total_commute_time']
         cols_to_show.append(new_col_name)
     return commute_df[cols_to_show]
 
@@ -133,6 +135,20 @@ def get_vehicle_info(vehicle_df):
     return vehicle_df[['GEOID', 'Total_num_vehicles']]
 
 
+def find_pct_hisp(hisp_df):
+    '''
+
+    Input:
+        hisp_df:
+
+    Output:
+
+    '''
+    hisp_df['pct_hisp'] = hisp_df['Hispanic or Latino_hispanic_res'] / \
+                          hisp_df['Total_hispanic_res']
+    return hisp_df[['GEOID', 'pct_hisp']]
+
+
 def find_per_pop(df, col1, col2, new_col):
     '''
     Gets the percent or per person count for each census block instead of
@@ -140,9 +156,9 @@ def find_per_pop(df, col1, col2, new_col):
 
     Input:
         df: full acs dataframe
-        col1:
-        col2:
-        new_col:
+        col1(str): numerator column
+        col2(str): denominator column (usually total pop or total households)
+        new_col(str): new column name
 
     Output: full acs df with pct/per person count instead of a raw count
     '''
@@ -153,15 +169,17 @@ def find_per_pop(df, col1, col2, new_col):
 
 def find_rel_cols(df, min_val, max_val, regex_str):
     '''
+    Find relevant columns in a dataframe, i.e. those with numbers between the
+    min and max values given
 
     Inputs:
-        df:
-        min_val(int/float):
-        max_val(int/float):
-        regex_str:
+        df: pandas df that has numbers in col name
+        min_val(int/float): minimum value (inclusive)
+        max_val(int/float): maximum value (exclusive) 
+        regex_str: regex to extract numbers from col names
 
     Output
-        rel_cols_set
+        rel_cols_set: set of relevant column names
     '''
     rel_cols_set = set()
     for col in df.columns:
@@ -177,7 +195,8 @@ SPEC_CLEANING_FNS = {
     'race.csv': get_race_info,
     'commute_time.csv': get_commute_info,
     'employment.csv': get_employment_info,
-    'num_vehicles.csv': get_vehicle_info
+    'num_vehicles.csv': get_vehicle_info,
+    'hispanic_res.csv': find_pct_hisp
 }
 
 
@@ -200,7 +219,6 @@ def load_link_acs(folder='data/ACS/', cleaning_fns=SPEC_CLEANING_FNS):
         saved_name = f'{folder}{csvname}'
         for file in rel_files:
             if file == saved_name:
-                print(file)
                 dirty_df = pd.read_csv(file)
                 cleaned_df = cleaning_fns[csvname](dirty_df)
                 df_lst.append(cleaned_df)
@@ -315,4 +333,5 @@ def combine_all_data():
     stops_blocks = join_count_stations(blocks_gdf, [el_stops_gdf, bus_stops_gdf])
     merged = pd.merge(stops_blocks, acs_df)
     merged['density'] = merged['total_pop'] / merged['area']
+    merged['interaction'] = merged['num_stops'] * merged['pct_transit']
     return merged
