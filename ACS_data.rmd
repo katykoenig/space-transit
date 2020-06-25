@@ -67,6 +67,14 @@ for (var in desired_vars){
 
 
 boundaries <- download_data('B19001')
-block_group_bound <- boundaries[,c('GEOID', 'NAME', 'geometry')]
-st_write(block_group_bound[-c(2773),], "data/shp_files/block_groups.shp")
+block_group_bound <- boundaries[-c(2773), c('GEOID', 'NAME', 'geometry')]
+
+cleaned <- block_group_bound[!(block_group_bound$'GEOID' %in%
+                                   c(170313515001, 170313817001,
+                                     170310608002, 170310619024,
+                                     170313511003, 170310609002,
+                                     170319800001, 170319801001,
+                                     '170310314004')), ]
+
+st_write(cleaned, "data/shp_files/block_groups.shp")
 ```
