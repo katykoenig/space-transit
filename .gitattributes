@@ -1,2 +1,2 @@
 *.rmd linguist-language=R
-*.ipynb linguist-language=python
+*.ipynb linguist-language=Python
